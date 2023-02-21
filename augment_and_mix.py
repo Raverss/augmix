@@ -13,7 +13,7 @@
 # limitations under the License.
 # ==============================================================================
 """Reference implementation of AugMix's data augmentation method in numpy."""
-import augmentations
+from augmix import augmentations
 import numpy as np
 from PIL import Image
 
@@ -31,10 +31,10 @@ def normalize(image):
 
 
 def apply_op(image, op, severity):
-  image = np.clip(image * 255., 0, 255).astype(np.uint8)
+  image = np.clip(image, 0, 255).astype(np.uint8)
   pil_img = Image.fromarray(image)  # Convert to PIL.Image
   pil_img = op(pil_img, severity)
-  return np.asarray(pil_img) / 255.
+  return np.asarray(pil_img, dtype=np.float32)
 
 
 def augment_and_mix(image, severity=3, width=3, depth=-1, alpha=1.):
@@ -51,11 +51,11 @@ def augment_and_mix(image, severity=3, width=3, depth=-1, alpha=1.):
   Returns:
     mixed: Augmented and mixed image.
   """
+  image = image.astype(np.float32)
   ws = np.float32(
       np.random.dirichlet([alpha] * width))
   m = np.float32(np.random.beta(alpha, alpha))
-
-  mix = np.zeros_like(image)
+  mix = np.zeros_like(image, dtype=np.float32)
   for i in range(width):
     image_aug = image.copy()
     d = depth if depth > 0 else np.random.randint(1, 4)
@@ -63,8 +63,8 @@ def augment_and_mix(image, severity=3, width=3, depth=-1, alpha=1.):
       op = np.random.choice(augmentations.augmentations)
       image_aug = apply_op(image_aug, op, severity)
     # Preprocessing commutes since all coefficients are convex
-    mix += ws[i] * normalize(image_aug)
+    mix += ws[i] * image_aug
 
-  mixed = (1 - m) * normalize(image) + m * mix
-  return mixed
+  mixed = (1 - m) * image + m * mix
+  return mixed.astype(np.uint8)
 
